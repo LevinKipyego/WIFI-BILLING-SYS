@@ -18,7 +18,7 @@ DB_CONFIG = {
     "host": "127.0.0.1",
     "user": "root",
     "password": "",       # <-- change this to your MySQL password
-    "database": "wifi_billing"
+    "database": "BILLING"
 }
 
 # -------------------------
@@ -133,30 +133,32 @@ def callback():
             phone = data["Body"]["stkCallback"]["CallbackMetadata"]["Item"][4]["Value"]
 
             # ✅ Update your MySQL transaction record
-            #cur = mysql.connection.cursor()
             conn = get_connection()
-            cur = conn.cursor(dictionary=True)
-
-            cur.execute("""
+            cursor = conn.cursor()
+            
+            cursor.execute("""
                 UPDATE transactions
                 SET status=%s, mpesa_receipt=%s
                 WHERE transaction_uuid=%s
             """, ("success", mpesa_receipt, transaction_uuid))
             conn.commit()
-            cur.close()
+            cursor.close()
             conn.close()
 
             print(f"Payment SUCCESS for {phone}, amount: {amount}, receipt: {mpesa_receipt}")
         else:
             # FAILED or CANCELLED
-            cur = mysql.connection.cursor()
-            cur.execute("""
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute("""
                 UPDATE transactions
                 SET status=%s
                 WHERE transaction_uuid=%s
             """, ("failed", transaction_uuid))
-            mysql.connection.commit()
-            cur.close()
+            connection.commit()
+            cursor.close()
+            connection.close()
 
             print(f"Payment FAILED: {result_desc}")
 
