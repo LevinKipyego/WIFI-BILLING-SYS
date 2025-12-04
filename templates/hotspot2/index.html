@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>MikroTik Hotspot Login</title>
+<style>
+/* --- BASIC RESET --- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  padding: 20px;
+}
+.hidden { display: none !important; }
+button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 16px;
+}
+
+/* --- ALERTS --- */
+.alert {
+  padding: 12px 16px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.alert.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.alert-success { background: #d4edda; color: #155724; }
+.alert-error { background: #f8d7da; color: #721c24; }
+.alert-warning { background: #fff3cd; color: #856404; }
+
+/* --- CONTAINER --- */
+#main-container, #reconnect-modal, #payment-modal {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  max-width: 420px;
+  margin: auto;
+}
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+/* packages */
+.packages { display: grid; grid-template-columns: 1fr 1fr; gap:10px; margin:12px 0; }
+.pkg-btn { padding:10px; border-radius:8px; background:#2563eb; color:#fff; border:none; cursor:pointer }
+.more-btn { background:#374151; color:#fff; padding:10px 16px; border-radius:8px; border:none; cursor:pointer }
+
+.modal-overlay { position: fixed; inset:0; background: rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; padding:18px }
+</style>
+</head>
+<body>
+
+<div id="alert-container"></div>
+
+<div id="main-container">
+  <h3 style="text-align:center;">Choose Your WiFi Package</h3>
+
+  <div class="packages" id="package-list">
+    <!-- Visible packages -->
+    <button class="pkg-btn" onclick="openPayment('10','1 device 3hrs', 1)">Ksh10 · 1 device · 3hrs</button>
+    <button class="pkg-btn" onclick="openPayment('15','1 device 5hrs', 2)">Ksh15 · 1 device · 5hrs</button>
+  </div>
+
+  <div style="text-align:center; margin-bottom:12px;">
+    <button class="more-btn" onclick="toggleMore()">More Packages</button>
+  </div>
+
+  <div class="packages hidden" id="more-packages">
+    <button class="pkg-btn" onclick="openPayment('20','1 device 8hrs', 3)">Ksh20 · 1 device · 8hrs</button>
+    <button class="pkg-btn" onclick="openPayment('30','1 device 12hrs', 4)">Ksh30 · 1 device · 12hrs</button>
+    <button class="pkg-btn" onclick="openPayment('50','1 device 24hrs', 5)">Ksh50 · 1 device · 24hrs</button>
+    <button class="pkg-btn" onclick="openPayment('100','1 device 48hrs', 6)">Ksh100 · 1 device · 48hrs</button>
+  </div>
+
+  <div style="text-align:center; margin-top:14px;">
+    <button onclick="openReconnect()">Reconnect</button>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div id="payment-modal" class="hidden">
+  <div class="modal-overlay">
+    <div style="background:#fff;padding:18px;border-radius:10px;max-width:420px;width:100%;">
+      <h3 id="payment-title">Pay</h3>
+      <input id="phone-input" placeholder="Enter Phone (e.g. 2547XXXXXXXX)">
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="pay-now-btn" onclick="submitPayment()">Pay Now</button>
+        <button onclick="closeModal()" style="background:#e5e7eb;color:#111;">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reconnect Modal -->
+<div id="reconnect-modal" class="hidden">
+  <div class="modal-overlay">
+    <div style="background:#fff;padding:18px;border-radius:10px;max-width:420px;width:100%;">
+      <h3>Reconnect</h3>
+      <input id="reconnect-phone" placeholder="2547XXXXXXXX">
+      <input id="reconnect-password" type="password" placeholder="Password">
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="reconnect-btn" onclick="submitReconnect()">Reconnect</button>
+        <button onclick="closeReconnect()" style="background:#e5e7eb;color:#111;">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ------------------------- ALERT SYSTEM ------------------------ */
+window.showAlert = function(type, message, timeout = 3000) {
+    const container = document.getElementById('alert-container');
+    const div = document.createElement('div');
+    div.className = `alert alert-${type}`;
+    div.textContent = message;
+    container.appendChild(div);
+
+    setTimeout(() => div.classList.add('show'), 50);
+    setTimeout(() => {
+        div.classList.remove('show');
+        setTimeout(() => div.remove(), 400);
+    }, timeout);
+};
+
+/* ------------------------- PHONE NORMALIZER ------------------------ */
+function normalizePhone(input) {
+    let p = (input || '').replace(/\D/g, "");
+    if (p.startsWith("07")) p = "254" + p.slice(1);
+    else if (p.startsWith("7")) p = "254" + p;
+    else if (p.startsWith("+254")) p = p.slice(1);
+    // if already starts with 254, keep
+    return p;
+}
+
+/* ------------------------- OPEN PAYMENT ------------------------ */
+window.openPayment = function (amount, details, packageId) {
+    const raw = '';
+    selectedPackage = { amount, details, packageId };
+    document.getElementById('payment-title').innerText = `Pay Ksh ${amount} — ${details}`;
+    document.getElementById('main-container').classList.add('hidden');
+    document.getElementById('payment-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('phone-input').focus(), 50);
+};
+
+window.closeModal = function(){
+    document.getElementById('payment-modal').classList.add('hidden');
+    document.getElementById('main-container').classList.remove('hidden');
+    document.getElementById('phone-input').value = '';
+};
+
+window.submitPayment = async function(){
+    const raw = document.getElementById('phone-input').value.trim();
+    if(!raw){ showAlert('warning','Please enter your phone number.'); document.getElementById('phone-input').focus(); return; }
+    const phone = normalizePhone(raw);
+    if(!/^2547\d{8}$/.test(phone)){ showAlert('error','Invalid phone format. Use 2547XXXXXXXX'); return; }
+
+    const payload = { phone, package_id: selectedPackage.packageId, amount: selectedPackage.amount };
+    const btn = document.getElementById('pay-now-btn');
+    try{
+        btn.disabled = true; btn.innerText = 'Processing...';
+        const res = await fetch('/buy-package',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        let data = {}; try{ data = await res.json(); }catch(e){}
+        if(res.ok) showAlert('success', data.message || 'Payment initiated'); else showAlert('error', (data && data.error) || 'Payment failed');
+    }catch(err){ console.error(err); showAlert('error','Network error: '+err.message); }
+    finally{ btn.disabled=false; btn.innerText='Pay Now'; closeModal(); }
+};
+
+// Toggle more packages visibility
+window.toggleMore = function() {
+    const morePackages = document.getElementById('more-packages');
+    morePackages.classList.toggle('hidden');
+};
+
+window.openReconnect = function(){
+    document.getElementById('main-container').classList.add('hidden');
+    document.getElementById('reconnect-modal').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('reconnect-phone').focus(),50);
+};
+
+window.closeReconnect = function(){
+    document.getElementById('reconnect-modal').classList.add('hidden');
+    document.getElementById('main-container').classList.remove('hidden');
+    document.getElementById('reconnect-phone').value=''; document.getElementById('reconnect-password').value='';
+};
+
+window.submitReconnect = async function(){
+    const raw = document.getElementById('reconnect-phone').value.trim(); const pass = document.getElementById('reconnect-password').value;
+    if(!raw || !pass){ showAlert('warning','Please enter both phone and password'); return; }
+    const phone = normalizePhone(raw);
+    if(!/^2547\d{8}$/.test(phone)){ showAlert('error','Invalid phone format. Use 2547XXXXXXXX'); return; }
+
+    const payload = { phone, password: pass };
+    const btn = document.getElementById('reconnect-btn');
+    try{ btn.disabled=true; btn.innerText='Reconnecting...'; const res = await fetch('/reconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); let data={}; try{data=await res.json();}catch(e){} if(res.ok) showAlert('success', data.message||'Reconnected'); else showAlert('error', (data&&data.error)||'Reconnect failed'); }
+    catch(err){ console.error(err); showAlert('error','Network error: '+err.message); }
+    finally{ btn.disabled=false; btn.innerText='Reconnect'; closeReconnect(); }
+};
+
+// keep a small selectedPackage global placeholder
+var selectedPackage = { packageId: null, amount: null, details: null };
+
+</script>
+
+</body>
+</html>

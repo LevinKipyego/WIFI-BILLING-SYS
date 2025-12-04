@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <style>
+        body {
+    margin: 0;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.slider-wrapper {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    overflow: hidden;
+}
+
+/* Background blur */
+#blur-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(30px) brightness(0.5);
+    transition: background-image 0.6s ease;
+}
+
+.slider-container {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* Track */
+.slider-track {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    transition: transform 0.45s ease;
+}
+
+/* Slide item */
+.slide {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    border-radius: 20px;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    transition: 0.45s;
+    opacity: 0.6;
+}
+
+.slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Center slide (active) */
+.slide.active {
+    width: 260px;
+    height: 260px;
+    opacity: 1;
+    transform: scale(1.15) translateZ(60px);
+    z-index: 4;
+}
+
+/* 3D Coverflow effect */
+.slide.left {
+    transform: rotateY(30deg) scale(0.85);
+}
+.slide.right {
+    transform: rotateY(-30deg) scale(0.85);
+}
+
+/* Fade transition mode */
+.fade-mode .slider-track {
+    transition: none !important;
+}
+.fade-mode .slide {
+    position: absolute;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+.fade-mode .slide.active {
+    opacity: 1;
+}
+
+/* Caption */
+.caption {
+    position: absolute;
+    bottom: 12px;
+    width: 100%;
+    text-align: center;
+    opacity: 0;
+    transition: 0.3s;
+}
+.slide.active .caption {
+    opacity: 1;
+}
+
+.caption h3 {
+    margin: 0;
+    font-size: 17px;
+}
+.caption button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+/* Navigation arrows */
+.nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #ffffff88;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 22px;
+    color: #111;
+    z-index: 5;
+}
+.left { left: 20px; }
+.right { right: 20px; }
+
+/* Pagination dots */
+#pagination {
+    position: absolute;
+    bottom: 12px;
+    width: 100%;
+    text-align: center;
+}
+.dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: #bbb;
+    border-radius: 50%;
+    margin: 0 5px;
+    cursor: pointer;
+}
+.dot.active {
+    background: #fff;
+}
+
+/* Autoplay button */
+#autoplay-toggle {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: #ffffffaa;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+    </style>
+    <title>Document</title>
+</head>
+<body>
+    <div class="slider-wrapper">
+
+    <div id="blur-bg"></div>
+
+    <!-- Slider Container -->
+    <div class="slider-container">
+        <div class="slider-track" id="track"></div>
+    </div>
+
+    <!-- Navigation -->
+    <button class="nav-btn left" id="prevBtn">❮</button>
+    <button class="nav-btn right" id="nextBtn">❯</button>
+
+    <!-- Pagination dots -->
+    <div id="pagination"></div>
+
+    <!-- Autoplay Toggle -->
+    <button id="autoplay-toggle">⏸ Pause</button>
+</div>
+<script>
+    let slides = [];
+let index = 0;
+let autoplay = true;
+let autoSlideInterval;
+
+const track = document.getElementById("track");
+const blurBg = document.getElementById("blur-bg");
+const pagination = document.getElementById("pagination");
+const autoplayBtn = document.getElementById("autoplay-toggle");
+
+/* -------- LOAD IMAGES FROM BACKEND API -------- */
+async function loadSlides() {
+    const res = await fetch("http://127.0.0.1:5000/api/slides");
+    const data = await res.json();
+
+    data.forEach((item, i) => {
+        const div = document.createElement("div");
+        div.className = "slide";
+        div.innerHTML = `
+            <img src="${item.url}">
+            <div class="caption">
+                <h3>${item.caption}</h3>
+                <button>View</button>
+            </div>
+        `;
+        track.appendChild(div);
+    });
+
+    slides = [...document.querySelectorAll(".slide")];
+    createDots(slides.length);
+    updateSlider();
+    startAutoplay();
+}
+
+/* -------- PAGINATION DOTS -------- */
+function createDots(count) {
+    pagination.innerHTML = "";
+    for (let i = 0; i < count; i++) {
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.onclick = () => {
+            index = i;
+            updateSlider();
+        };
+        pagination.appendChild(dot);
+    }
+}
+
+/* -------- NAVIGATION -------- */
+document.getElementById("prevBtn").onclick = () => {
+    index = (index - 1 + slides.length) % slides.length;
+    updateSlider();
+};
+document.getElementById("nextBtn").onclick = () => {
+    index = (index + 1) % slides.length;
+    updateSlider();
+};
+
+/* -------- AUTOPLAY -------- */
+function startAutoplay() {
+    autoSlideInterval = setInterval(() => {
+        if (!autoplay) return;
+        index = (index + 1) % slides.length;
+        updateSlider();
+    }, 2500);
+}
+
+autoplayBtn.onclick = () => {
+    autoplay = !autoplay;
+    autoplayBtn.innerText = autoplay ? "⏸ Pause" : "▶ Play";
+};
+
+/* -------- UPDATE UI -------- */
+function updateSlider() {
+    // 3D coverflow
+    slides.forEach((slide, i) => {
+        slide.classList.remove("active", "left", "right");
+
+        if (i === index) slide.classList.add("active");
+        if (i === index - 1) slide.classList.add("left");
+        if (i === index + 1) slide.classList.add("right");
+    });
+
+    // pagination
+    document.querySelectorAll(".dot").forEach((d, i) =>
+        d.classList.toggle("active", i === index)
+    );
+
+    // background blur
+    blurBg.style.backgroundImage =
+        `url(${slides[index].querySelector("img").src})`;
+
+    // move track
+    track.style.transform = `translateX(${-index * 210}px)`;
+}
+
+/* -------- SWIPE -------- */
+let startX = 0;
+track.addEventListener("touchstart", e => startX = e.touches[0].clientX);
+track.addEventListener("touchend", e => {
+    const diff = e.changedTouches[0].clientX - startX;
+    if (diff > 60 && index > 0) index--;
+    else if (diff < -60 && index < slides.length - 1) index++;
+    updateSlider();
+});
+
+/* -------- INIT -------- */
+loadSlides();
+
+</script>
+</body>
+</html>

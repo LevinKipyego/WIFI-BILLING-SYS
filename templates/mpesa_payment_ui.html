@@ -1,134 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M-Pesa STK Push Simulator</title>
-    <!-- Load Tailwind CSS -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>levine.net</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'mpesa-green': '#19a741',
-                        'mpesa-dark': '#0f6e2b',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Custom font import for aesthetics */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-    </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans p-4">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <!-- Main container gets an id so we can reliably hide/show it -->
+    <div id="main-container" class="w-full max-w-lg bg-white shadow-xl rounded-2xl p-6 space-y-6">
+        <h1 class="text-2xl font-bold text-center">Choose Your WiFi Package</h1>
 
-    <div class="w-full max-w-sm bg-white rounded-xl shadow-2xl p-6 md:p-8 space-y-6">
-        
-        <header class="text-center">
-            <h1 class="text-3xl font-extrabold text-mpesa-dark flex items-center justify-center space-x-2">
-                <!-- Simple M-Pesa Icon (M-Pesa Green) -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-mpesa-green" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM5 9a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H6z" clip-rule="evenodd" />
-                </svg>
-                <span>M-Pesa Checkout</span>
-            </h1>
-            <p class="text-gray-500 mt-2 text-sm">Initiate Ksh 20 Payment (Simulated STK Push)</p>
-        </header>
-
-        <div class="space-y-4">
-            <label for="phone_number" class="block text-sm font-medium text-gray-700">Your M-Pesa Number</label>
-            <input type="tel" id="phone_number" name="phone_number" required placeholder="e.g., 0712345678"
-                   class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-mpesa-green focus:border-mpesa-green sm:text-sm transition duration-150 ease-in-out">
-            
-            <p id="amount_info" class="text-center text-lg font-semibold text-gray-600 border-t pt-4">
-                Amount Due: <span class="text-mpesa-dark font-extrabold">Ksh 20.00</span>
-            </p>
+        <!-- Package List -->
+        <div id="package-list" class="space-y-3">
+            <!-- Default Visible Packages -->
+            <button class="w-full p-4 bg-blue-600 text-white rounded-xl shadow" onclick="openPayment('10','1 device 3hrs')">
+                Ksh 10 • 1 device • 3 hrs
+            </button>
+            <button class="w-full p-4 bg-blue-600 text-white rounded-xl shadow" onclick="openPayment('15','1 device 5hrs')">
+                Ksh 15 • 1 device • 5 hrs
+            </button>
         </div>
 
-        <!-- The "Tag" that triggers the payment -->
-        <button onclick="initiatePayment()" id="pay_button"
-            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-medium text-white bg-mpesa-green hover:bg-mpesa-dark focus:outline-none focus:ring-4 focus:ring-mpesa-green focus:ring-opacity-50 transition duration-300 ease-in-out transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Click to send M-Pesa payment prompt">
-            <span id="button_text">Send M-Pesa Request</span>
-            <svg id="loading_spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+        <!-- More Packages Button -->
+        <button id="show-more-btn" class="w-full p-3 bg-gray-800 text-white rounded-xl" onclick="toggleMore()">
+            More Packages
         </button>
 
-        <!-- Message/Response Display Area -->
-        <div id="response_message" class="mt-4 p-4 rounded-lg text-center font-medium transition duration-500 ease-in-out hidden">
-            <!-- Content populated by JavaScript -->
+        <!-- Hidden Packages -->
+        <div id="more-packages" class="space-y-3 hidden">
+            <button class="w-full p-4 bg-blue-600 text-white rounded-xl shadow" onclick="openPayment('20','1 device 8hrs')">
+                Ksh 20 • 1 device • 8 hrs
+            </button>
+            <button class="w-full p-4 bg-blue-600 text-white rounded-xl shadow" onclick="openPayment('30','1 device 12hrs')">
+                Ksh 30 • 1 device • 12 hrs
+            </button>
+            <button class="w-full p-4 bg-blue-600 text-white rounded-xl shadow" onclick="openPayment('50','1 device 24hrs')">
+                Ksh 50 • 1 device • 24 hrs
+            </button>
         </div>
 
+        <!-- Reconnect Button -->
+        <button class="w-full p-3 bg-green-600 text-white rounded-xl" onclick="openReconnect()">
+            Reconnect
+        </button>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-4">
+            <h2 id="payment-title" class="text-xl font-semibold text-center"></h2>
+
+            <input id="phone-input" type="text" placeholder="Enter Phone Number"
+                class="w-full p-3 border rounded-xl" />
+
+            <button id="pay-now-btn" onclick="submitPayment()" class="w-full p-3 bg-blue-600 text-white rounded-xl">Pay Now</button>
+            <button onclick="closeModal()" class="w-full p-3 bg-gray-300 rounded-xl">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Reconnect Modal -->
+    <div id="reconnect-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-4">
+            <h2 class="text-xl font-semibold text-center">Reconnect to WiFi</h2>
+
+            <input id="reconnect-phone" type="text" placeholder="Phone Number" class="w-full p-3 border rounded-xl" />
+            <input id="reconnect-password" type="password" placeholder="Password" class="w-full p-3 border rounded-xl" />
+
+            <button class="w-full p-3 bg-green-600 text-white rounded-xl" onclick="submitReconnect()">Reconnect</button>
+            <button onclick="closeReconnect()" class="w-full p-3 bg-gray-300 rounded-xl">Cancel</button>
+        </div>
     </div>
 
     <script>
-        const phoneInput = document.getElementById('phone_number');
-        const payButton = document.getElementById('pay_button');
-        const buttonText = document.getElementById('button_text');
-        const loadingSpinner = document.getElementById('loading_spinner');
-        const responseDiv = document.getElementById('response_message');
+        // Toggle visibility of the hidden package section
+        function toggleMore() {
+            const more = document.getElementById('more-packages');
+            more.classList.toggle('hidden');
+        }
 
-        async function initiatePayment() {
-            const phoneNumber = phoneInput.value.trim();
+        let selectedPackage = {};
 
-            // Simple client-side validation
-            if (!phoneNumber) {
-                displayMessage("Please enter your M-Pesa number.", false);
+        // Open payment modal and hide the main page
+        function openPayment(amount, details) {
+            selectedPackage = { amount, details };
+            document.getElementById('payment-title').innerText = `Pay Ksh ${amount} — ${details}`;
+
+            // Hide main container when modal is open
+            document.getElementById('main-container').classList.add('hidden');
+
+            const modal = document.getElementById('payment-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // focus the phone input for quick typing
+            setTimeout(() => document.getElementById('phone-input').focus(), 50);
+        }
+
+        // Close payment modal and show the main page again
+        function closeModal() {
+            const modal = document.getElementById('payment-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            document.getElementById('main-container').classList.remove('hidden');
+
+            // clear selected package for safety
+            selectedPackage = {};
+            document.getElementById('phone-input').value = '';
+        }
+
+        // Simulated payment submission — replace with a POST to your Flask endpoint
+        function submitPayment() {
+            const phone = document.getElementById('phone-input').value.trim();
+            if (!phone) {
+                alert('Please enter your phone number.');
+                document.getElementById('phone-input').focus();
                 return;
             }
 
-            // Disable button and show loading
-            payButton.disabled = true;
-            buttonText.textContent = 'Processing...';
-            loadingSpinner.classList.remove('hidden');
-            responseDiv.classList.add('hidden');
+            // Here you would call your Flask backend (example using fetch):
+            // fetch('/buy-package', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ phone, package: selectedPackage }) })
+            //   .then(res=>res.json()).then(...)
 
-            try {
-                const response = await fetch('/stk_push_request', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ phone_number: phoneNumber }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    displayMessage(data.message, true);
-                } else {
-                    // Handle API-level errors (e.g., validation failed)
-                    displayMessage(data.message || "An unknown error occurred.", false);
-                }
-
-            } catch (error) {
-                console.error('Fetch error:', error);
-                displayMessage("Network error. Could not connect to the server.", false);
-            } finally {
-                // Re-enable button and hide loading
-                payButton.disabled = false;
-                buttonText.textContent = 'Send M-Pesa Request';
-                loadingSpinner.classList.add('hidden');
-            }
+            alert(`Processing payment of Ksh ${selectedPackage.amount} for ${phone}`);
+            closeModal();
         }
 
-        function displayMessage(message, isSuccess) {
-            responseDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800');
-            responseDiv.textContent = message;
-            
-            if (isSuccess) {
-                responseDiv.classList.add('bg-green-100', 'text-green-800');
-            } else {
-                responseDiv.classList.add('bg-red-100', 'text-red-800');
+        // Open reconnect modal and hide the main page
+        function openReconnect() {
+            document.getElementById('main-container').classList.add('hidden');
+
+            const modal = document.getElementById('reconnect-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            setTimeout(() => document.getElementById('reconnect-phone').focus(), 50);
+        }
+
+        // Close reconnect modal and show main page
+        function closeReconnect() {
+            const modal = document.getElementById('reconnect-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            document.getElementById('main-container').classList.remove('hidden');
+
+            document.getElementById('reconnect-phone').value = '';
+            document.getElementById('reconnect-password').value = '';
+        }
+
+        // Simulated reconnect flow — replace with your actual authentication
+        function submitReconnect() {
+            const phone = document.getElementById('reconnect-phone').value.trim();
+            const pass = document.getElementById('reconnect-password').value;
+            if (!phone || !pass) {
+                alert('Please enter both phone number and password.');
+                return;
             }
+
+            // Example: POST to /reconnect with credentials
+            alert(`Attempting reconnect for ${phone}`);
+            closeReconnect();
         }
     </script>
 </body>
