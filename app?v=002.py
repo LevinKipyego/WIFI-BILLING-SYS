@@ -1322,7 +1322,8 @@ def payment():
 
     # Return the raw STK response to frontend (keeps original contract)
     return jsonify(stk_response)
-
+    #HOTSPOT_GATEWAY_IP = '10.0.0.1'
+    #return auto_login_html(tx_uuid, f"http://{HOTSPOT_GATEWAY_IP}/login")
 
 
 @app.route('/callback', methods=['POST', 'GET'])

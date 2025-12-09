@@ -1,0 +1,131 @@
+<html>
+    <head>
+        <!-- CRITICAL FIX: The viewport meta tag ensures the browser renders the page 
+             at the width of the device, not a desktop default. -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <!-- START FONT IMPLEMENTATION: Poppins via Google Fonts CDN -->
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+        <!-- END FONT IMPLEMENTATION -->
+        
+        <style>
+            body {
+                /* Set Poppins as the primary font family */
+                font-family: 'Poppins', Arial, sans-serif;
+                text-align: center;
+                background: #f7f7f7;
+                /* Use flexbox to center the content vertically and horizontally */
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                margin: 0; /* Remove default body margin */
+            }
+            h3 {
+                color: #333;
+                margin-top: 0;
+            }
+            p {
+                color: #666;
+            }
+            .progress-container {
+                width: 100%; /* Make it responsive within the main-content max-width */
+                background: #ddd;
+                height: 12px;
+                border-radius: 10px;
+                margin: 20px 0;
+                overflow: hidden;
+            }
+            .progress-bar {
+                height: 100%;
+                width: 90%;
+                background: #4CAF50;
+                transition: width 1s linear;
+                border-radius: 10px; /* Match container border radius */
+            }
+            #counter {
+                
+                color: #444;
+                margin-top: 10px;
+                font-weight: 500;
+            }
+
+            .main-content {
+                background: #fff;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                /* Center content within itself */
+                display: flex;
+                flex-direction: column; 
+                align-items: center;
+                max-width: 500px; /* Set a reasonable max width for the card */
+                width: 90%; /* Responsive width */
+                margin: 20px;
+                font-size: 1em;
+                line-height: 1.6em;
+            }
+            .wrap {
+                width: 100%;
+                text-align: justify;
+            }
+
+            /* Responsive adjustments are now primarily handled by max-width and percentage widths */
+            @media (max-width: 600px) {
+                .main-content {
+                    padding: 20px;
+                    max-width:480px;
+                }
+            }
+        </style>
+
+        <script>
+            let refreshInterval = 5;  // seconds until next auto-refresh
+            let countdown = refreshInterval;
+
+            function startCountdown() {
+                const bar = document.getElementById("bar");
+                const counter = document.getElementById("counter");
+
+                function tick() {
+                    // Calculate the percentage remaining
+                    const percentage = (countdown / refreshInterval) * 100;
+                    
+                    counter.textContent = countdown + "s";
+                    // Update the bar width based on the countdown
+                    bar.style.width = percentage + "%";
+
+                    countdown--;
+
+                    if (countdown < 0) {
+                        // When countdown finishes, reload the page to check status
+                        window.location.reload();
+                    } else {
+                        // Continue counting down
+                        setTimeout(tick, 1000);
+                    }
+                }
+                tick();
+            }
+            
+            // Start the countdown when the window loads
+            window.onload = startCountdown;
+        </script>
+    </head>
+
+    <body>
+        <div class='main-content'>
+            <div class="wrap">
+                <h3>Payment is processing...</h3>
+                <p>Please wait — we will log you in automatically once your payment is confirmed.</p>
+            </div>
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-bar" id="bar"></div>
+            </div>
+            <!-- Countdown Timer -->
+            <div id="counter">5s</div>
+            <p style="color:#777; margin-top:20px;">Checking your payment...</p>
+        </div>
+    </body>
+</html>
