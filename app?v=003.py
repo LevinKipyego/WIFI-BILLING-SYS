@@ -37,19 +37,6 @@ callback_url = os.getenv("CALLBACK_URL")  # will include ?tx=uuid
 def get_connection(cfg=DB_CONFIG):
     return mysql.connector.connect(**cfg)
 
-
-# -------------------------
-# Plan helpers
-# -------------------------
-def get_plan_by_id(plan_id):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM user_plans WHERE id = %s", (plan_id,))
-    plan = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return plan
-
 # --- transaction helpers (simple) ---
 def create_transaction(phone, plan_id, amount, hotspot_data=None):
     tx_uuid = str(uuid.uuid4())
@@ -176,43 +163,44 @@ def stk_push(phone, amount, transaction_uuid, account_ref="WiFi", description="H
     return r.json()
 
 # --- Endpoints ---
-@app.route("/", methods=['POST', 'GET'])
-def home():
-    return jsonify({"message": "Welcome to the Hotspot API"}), 200
 
-@app.route('/pay', methods=['GET', 'POST'])
-def payment():
-    # fetch data from frontend as json
-    print(request.headers)
-    print(request.data)
-    
+@app.route('/pay', methods=['POST'])
+def pay():
+    """
+    Frontend sends phone, plan_id and hotspot_data (mac, ip, link_login, sessionid).
+    Returns STK push response (so frontend shows "Enter PIN" prompt).
+    """
     data = request.get_json() or {}
-    phone = data.get("phone")
-    plan_id = data.get("plan_id")
-    hotspot_data = data.get("hotspot_data") or {}
+    phone = data.get('phone')
+    plan_id = data.get('plan_id')
+    hotspot_data = data.get('hotspot_data') or {}
 
     if not phone or not plan_id:
-        return jsonify({"error": "phone and plan_id required"}), 400
+        return jsonify({"error":"phone and plan_id required"}), 400
 
-    plan = get_plan_by_id(plan_id)
+    # get plan details from billing DB
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT * FROM user_plans WHERE id=%s", (plan_id,))
+    plan = cur.fetchone()
+    cur.close(); conn.close()
     if not plan:
         return jsonify({"error":"plan not found"}), 400
 
-    amount = int(plan['price'])
-
-    # Create transaction record
+    amount = float(plan['price'])
     tx_uuid = create_transaction(phone, plan_id, amount, hotspot_data)
 
     try:
-        stk_response = stk_push(phone, amount, tx_uuid, hotspot_data=hotspot_data)
+        stk_resp = stk_push(phone, amount, tx_uuid)
+        # Save merchant/checkout ids to tx
+        merchant = stk_resp.get("MerchantRequestID")
+        checkout = stk_resp.get("CheckoutRequestID")
+        update_transaction_with_stk_response(tx_uuid, merchant, checkout)
     except Exception as e:
-        logging.exception("stk push failed: %s", e)
+        logging.exception("STK push failed: %s", e)
         return jsonify({"error": str(e)}), 500
 
-    # Return the raw STK response to frontend (keeps original contract)
-    return jsonify(stk_response)
-    #HOTSPOT_GATEWAY_IP = '10.0.0.1'
-    #return auto_login_html(tx_uuid, f"http://{HOTSPOT_GATEWAY_IP}/login")
+    return jsonify({"tx": tx_uuid, "stk": stk_resp})
 
 @app.route('/check_tx', methods=['GET'])
 def check_tx():
@@ -337,4 +325,4 @@ def callback():
         return jsonify({"ResultCode":1, "ResultDesc":"Error"}), 500
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)), debug=False)

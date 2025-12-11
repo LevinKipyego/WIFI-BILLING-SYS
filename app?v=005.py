@@ -1,4 +1,9 @@
 from passwords import generate_random_password
+from APIs import get_mikrotik_api, \
+    find_active_session_by_username, \
+        remove_active_session_by_id, \
+            mikrotik_config
+from radius_db import upsert_radcheck, upsert_radreply
 
 from flask import Flask, redirect, render_template, request, jsonify, make_response
 import requests
@@ -6,13 +11,16 @@ import base64
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+
 import mysql.connector
 import uuid
 from flask_cors import CORS
 import threading
 import time
 import logging
+import urllib.parse
 
+# Optional: routeros_api for Mikrotik interactions
 
 
 # Load environment variables
@@ -883,63 +891,200 @@ def auto_login(tx):
 
 #_________________________CHECK USER ROUTE_________________________##
 
-@app.route('/reconnect/<username>', methods=['GET', 'POST'])
-def check_user(username):
+### ---------- Main route: reconnect & device-switch detection ----------
+@app.route("/reconnect/<username>", methods=["POST", "GET"])
+def reconnect(username):
+    """
+    POST with JSON { "password": "xxxxx", "mac": "AA:BB:CC", "client_ip": "10.0.0.5", "dst": "...optional..." }
+    Logic:
+     - verify provided passcode against hotspot_users.code_6char or radcheck (depending your flow)
+     - if account active on different MAC => show switch page
+     - if confirm switch (POST to /switch-device) => remove old session, update DB, return auto-login HTML
+     - otherwise return auto-login HTML immediately
+    """
+    # Accept both JSON (fetch) or form POST
+    data = request.get_json(silent=True) or request.form or {}
+    provided_password = data.get("password") or data.get("code")
+    new_mac = data.get("mac") or request.remote_addr  # mac should be provided by frontend if available
+    client_ip = data.get("ip") or request.remote_addr
+    dst = data.get("dst") or data.get("redirect") or "http://www.googleapis.com/generate_204"
+    dst = dst if dst.startswith("http") else "http://"+dst
+    dst_enc = urllib.parse.quote(dst, safe='')
+
     conn = get_connection()
-    cur = conn.cursor(dictionary=True, buffered=True)
-
-
+    cur = conn.cursor(dictionary=True)
     try:
-        data = request.get_json() or {}
-        password = data.get("password")
-
-        logging.info(f"Reconnect requested for user {username} with password: {password}")
-
-        # Fetch the hotspot user record
-        cur.execute("SELECT * FROM hotspot_users WHERE username = %s ORDER BY ID DESC LIMIT 1" , (username,))
+        # Get most recent user record
+        cur.execute("SELECT * FROM hotspot_users WHERE username=%s ORDER BY id DESC LIMIT 1", (username,))
         user = cur.fetchone()
-        if user:
-            logging.info(f"User {username} found.")
-            link_login = 'http://10.0.0.1/login'
-            mac = user.get('mac') or ''
-            client_ip = user.get('client_ip') or ''
-            #return jsonify({"status": "success", "message": f"User {username} exists."}), 200
-            if user['code_6char'] == password:
+        if not user:
+            return jsonify({"status":"error","message":"User not found"}), 404
 
-                logging.info(f"Authentication successful for user {username}.")
-                html = f"""
-                    <html>
-                        <head>
-                            <meta http-equiv="refresh" content="2;url=https://www.youtube.com/watch?v=pJK53pL_6sg">
-                        </head>
-                    <body onload="document.forms[0].submit()">
-                        <form action="{link_login}" method="post">
-                        <input type="hidden" name="username" value="{username}">
-                        <input type="hidden" name="password" value="{password}">
-                        
-                        <input type="hidden" name="mac" value="{mac}">
-                        <input type="hidden" name="ip" value="{client_ip}">
-                        <input type="hidden" name="login-by" value="name">
-                        
-                        </form>
-                        
-                        <p>Logging you in...</p>
-                    </body>
-                    </html>
-                    """
-                #resp = make_response(html)
-                #resp.headers['Content-Type'] = 'text/html'
-                return make_response(html, 200, {'Content-Type': 'text/html'})
-            else:
-                return jsonify({"status": "error", "message": f"Authentication failed for user {username}. Wrong passcode."}), 401
-        else:
-            return jsonify({"status": "error", "message": f"User {username} not found."}), 404
+        # If password mismatch -> fail (you may also consult radcheck instead)
+        expected = user.get('code_6char') or user.get('password')
+        if not provided_password or provided_password != expected:
+            return jsonify({"status":"error","message":"Authentication failed"}), 401
+
+        # Check existing active session for this username using MikroTik API
+        api = get_mikrotik_api()
+        try:
+            active = find_active_session_by_username(api, username)
+            logging.info("Active session for %s: %s", username, active)
+        
+        finally:
+            # keep api connection open until removal step maybe; we'll disconnect after potential remove
+            pass
+
+        # If there's an active session and MAC differs -> present switch page
+        if active and active.get('mac-address') and (active.get('mac-address').lower() != (new_mac or "").lower()):
+            # produce device switch decision page
+            old_mac = active.get('mac-address')
+            old_ip = active.get('address') or active.get('ip-address') or active.get('address')
+            old_id = active.get('.id') or active.get('id') or active.get('session-id')
+
+            logging.info("Device switch detected for %s: old MAC %s vs new MAC %s", username, old_mac, new_mac)
+
+            html = f"""
+            <html>
+            <head><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+            <body style="font-family:Arial,Helvetica,sans-serif;padding:20px;">
+                <h3>Device switch detected</h3>
+                <p>Your account is currently active on another device (MAC: {old_mac}, IP: {old_ip}).</p>
+                <p>Do you want to disconnect the other device and continue on this one?</p>
+                <form method="POST" action="http://192.168.100.88:5000/switch-device/{username}">
+                    <input type="hidden" name="old_id" value="{urllib.parse.quote(str(old_id))}">
+                    <input type="hidden" name="new_mac" value="{new_mac}">
+                    <input type="hidden" name="client_ip" value="{client_ip}">
+                    <input type="hidden" name="dst" value="{dst_enc}">
+                    <button type="submit" style="padding:12px 18px;font-size:16px;">Yes, switch device</button>
+                </form>
+                <p style="margin-top:16px;"><em>If you don't switch, you will stay logged in on the other device.</em></p>
+            </body>
+            </html>
+            """
+            return make_response(html, 200, {"Content-Type":"text/html"})
+
+        # No conflicting session -> proceed to auto-login HTML
+        # Ensure radcheck/radreply up to date (you might have already updated on payment)
+        upsert_radcheck(username, expected)
+        # Example radreply entries (session timeout etc) - adapt to packages
+        upsert_radreply(username, "Session-Timeout", str(3600))
+        upsert_radreply(username, "Acct-Interim-Interval", "60")
+
+        # Save client info & mark active in your app DB
+        cur.execute("""
+            UPDATE hotspot_users
+            SET mac=%s, client_ip=%s, session_status='active', updated_at=NOW()
+            WHERE id=%s
+        """, (new_mac, client_ip, user['id']))
+        conn.commit()
+
+        # Build the auto-post HTML that posts to MikroTik login
+        # include popup=true to improve CNA behavior
+        html = f"""
+        <html>
+            <head><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+            <body onload="document.forms[0].submit()">
+                <form action="{mikrotik_config['HOTSPOT_LOGIN_URL']}" method="post">
+                    <input type="hidden" name="username" value="{username}">
+                    <input type="hidden" name="password" value="{expected}">
+                    <input type="hidden" name="dst" value="{dst}">
+                    <input type="hidden" name="popup" value="true">
+                </form>
+                <p>Logging you in... If the page doesn&apos;t redirect automatically, <a href="{mikrotik_config['HOTSPOT_LOGIN_URL']}">click here</a>.</p>
+            </body>
+        </html>
+        """
+        return make_response(html, 200, {"Content-Type":"text/html"})
+
     except Exception as e:
-        logging.exception("Error checking user %s: %s", username, e)
-        return jsonify({"status": "db_error", "message": str(e)}), 500
+        logging.exception("Reconnect error: %s", e)
+        return jsonify({"status":"error","message":str(e)}), 500
+
     finally:
         cur.close()
         conn.close()
+        try:
+            api.disconnect()
+        except Exception:
+            pass
+
+### ---------- Switch-device handler ----------
+@app.route("/switch-device/<username>", methods=["POST"])
+def switch_device(username):
+    """
+    Called when user confirms device switch.
+    POST fields: old_id (mikrotik active .id), new_mac, client_ip, dst
+    """
+    old_id = request.form.get("old_id")
+    new_mac = request.form.get("new_mac")
+    client_ip = request.form.get("client_ip")
+    dst_enc = request.form.get("dst") or urllib.parse.quote("http://www.googleapis.com/generate_204", safe='')
+
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    api = get_mikrotik_api()
+    try:
+        # Remove the old active session on MikroTik
+        removed = False
+        try:
+            # old_id may be quoted in the form
+            old_id_decoded = urllib.parse.unquote(old_id)
+            removed = remove_active_session_by_id(api, old_id_decoded)
+            logging.info("Attempted removal of old session %s -> %s", old_id_decoded, removed)
+        except Exception:
+            logging.exception("Failed removing active session")
+
+        # Update DB - mark previous session expired
+        cur.execute("SELECT id FROM hotspot_users WHERE username=%s AND session_status='active' ORDER BY id DESC LIMIT 1", (username,))
+        row = cur.fetchone()
+        if row:
+            cur.execute("UPDATE hotspot_users SET session_status='expired', updated_at=NOW() WHERE id=%s", (row['id'],))
+            conn.commit()
+
+        # Get user record and prepare auto-login HTML for new device (use existing passcode)
+        cur.execute("SELECT * FROM hotspot_users WHERE username=%s ORDER BY id DESC LIMIT 1", (username,))
+        user = cur.fetchone()
+        if not user:
+            return "User record missing", 404
+
+        password = user.get('code_6char') or user.get('password')
+        # update DB with new mac and active status
+        cur.execute("UPDATE hotspot_users SET mac=%s, client_ip=%s, session_status='active', updated_at=NOW() WHERE id=%s",
+                    (new_mac, client_ip, user['id']))
+        conn.commit()
+
+        # return auto-login HTML
+        dst = urllib.parse.unquote(dst_enc)
+        html = f"""
+        <html>
+            <head><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+            <body onload="document.forms[0].submit()">
+                <form action="{mikrotik_config['HOTSPOT_LOGIN_URL']}" method="post">
+                    <input type="hidden" name="username" value="{username}">
+                    <input type="hidden" name="password" value="{password}">
+                    <input type="hidden" name="dst" value="{dst}">
+                    <input type="hidden" name="popup" value="true">
+                    <input type="hidden" name="mac" value="{new_mac}">
+                </form>
+                <p>Switching device and logging you in...</p>
+            </body>
+        </html>
+        """
+        return make_response(html, 200, {"Content-Type":"text/html"})
+
+    except Exception as e:
+        logging.exception("switch-device error: %s", e)
+        return str(e), 500
+
+    finally:
+        try:
+            api.disconnect()
+        except Exception:
+            pass
+        cur.close()
+        conn.close()
+
 
 #
 # -------------------------
