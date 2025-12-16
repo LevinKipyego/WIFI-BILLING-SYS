@@ -5,6 +5,7 @@ from APIs import get_mikrotik_api, \
             mikrotik_config
 from radius_db import upsert_radcheck, upsert_radreply
 
+
 from flask import Flask, redirect, render_template, request, jsonify, make_response
 import requests
 import base64
@@ -28,7 +29,7 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
+    
 # Logging
 logging.basicConfig(level=logging.INFO)
 
@@ -390,7 +391,7 @@ def stk_query(checkout_request_id):
 
 
 # -------------------------
-# Background reconciler
+#_________________CRON JOBS_______________
 # -------------------------
 
 def reconcile_pending_transactions():
@@ -503,10 +504,39 @@ def reconcile_pending_transactions():
         except Exception as exc:
             logging.exception(f"🔥 Error reconciling TX {tx.get('transaction_uuid')}: {exc}")
 
-    # Run again after 30s
-    threading.Timer(30, reconcile_pending_transactions).start()
+def expire_hotspot_users():
+    logging.info(f"⏰ Expire Hotspot Users Job started at {datetime.now()}")
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        sql = """
+        UPDATE hotspot_users
+        SET session_status = 'expired'
+        WHERE expires_at <= NOW()
+          AND session_status = 'active';
+        """
+        cur.execute(sql)
+        conn.commit()
+
+        logging.info(f"[Cron] Expired accounts updated at {datetime.now()}")
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        logging.exception(f"[Cron] Error updating expired users: {e}")
 
 
+def run_cron_jobs():
+    try:
+        reconcile_pending_transactions()
+        expire_hotspot_users()
+    except Exception as e:
+        logging.exception(f"Cron error: {e}")
+    finally:
+        # schedule next run after 60 seconds
+        threading.Timer(60, run_cron_jobs).start()
 
 # -------------------------
 # Routes (existing ones enhanced)
@@ -536,16 +566,60 @@ def payment():
     amount = int(plan['price'])
 
     # Create transaction record
-    tx_uuid = create_transaction(phone, plan_id, amount, hotspot_data)
-    logging.info(f'TX DATA {tx_uuid} ')
+    #tx_uuid = create_transaction(phone, plan_id, amount, hotspot_data)
+    #logging.info(f'TX DATA {tx_uuid} ')
 
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True, buffered=True)
     try:
+        
+        cur.execute('''
+                    SELECT
+                    u.username,
+                    u.session_status,
+                    t.status AS tx_status,
+                    t.transaction_uuid
+                    FROM user_transactions t
+                    LEFT JOIN hotspot_users u
+                    ON u.username = t.client_phone
+                    WHERE t.client_phone = %s
+                    ORDER BY t.created_at DESC
+                    LIMIT 1
+                    ''',(phone,))
+        user = cur.fetchone()
+        
+        if user and user.get('tx_status') == 'pending':
+            return jsonify({
+            "status": "pending",
+            "message": "You have a pending transaction. Please complete payment or \
+                        wait for confirmation or try again after few minutes.",
+           # "tx_id": user.get('transaction_uuid')
+            }), 200
+        
+        if user and user.get('session_status') == 'active':
+            return jsonify({
+            "status": "active",
+            "message": "Your purchased session is still active.",
+           # "tx_id": user.get('transaction_uuid')
+            }), 200
+
+        #if user and user.get('session_status') == 'active':
+          #  return jsonify({"status":"Expired", "message":"your session is still active"})
+        
+         # Create transaction record
+        tx_uuid = create_transaction(phone, plan_id, amount, hotspot_data)
+        logging.info(f'TX DATA {tx_uuid} ')
+
         stk_response = stk_push(phone, amount, tx_uuid, hotspot_data=hotspot_data)
         logging.info("STK Push response for tx %s: %s", tx_uuid, stk_response)
 
     except Exception as e:
         logging.exception("stk push failed: %s", e)
         return jsonify({"error": str(e)}), 500
+    
+    finally:
+        cur.close()
+        conn.close()
 
     # Return the raw STK response to frontend (keeps original contract)
     return jsonify({
@@ -641,7 +715,7 @@ def callback():
 
                         cur.execute("""
                             INSERT INTO hotspot_users (transaction_uuid, mac, username, mikrotik_profile, expires_at, client_ip, link_login, code_6char)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (transaction_uuid, tx.get('mac'), username, plan.get('mikrotik_profile') if plan else '', expires_at, tx.get('ip'), tx.get('link_login'), password))
                         conn.commit()
                         logging.info("  Hotspot user inserted: %s", username)
@@ -717,8 +791,7 @@ def auto_login(tx):
 
                         @font-face {
                             font-family: "Sour Gummy";
-                            src: url("/static/fonts/sour-gummy_5.2.8/webfonts/sour-gummy-latin-400-normal.woff") format("woff"),
-                                url("/static/fonts/sour-gummy_5.2.8/webfonts/sour-gummy-latin-400-normal.woff2") format("woff2");
+                            src:url("/static/fonts/sour-gummy_5.2.8/webfonts/sour-gummy-minimal.woff2") format("woff2");
                             font-weight: normal;
                             font-style: normal;
                             font-display: swap;
@@ -845,7 +918,7 @@ def auto_login(tx):
                     </div>
                 </body>
             </html>
-        """
+            """
         return html, 202
 
     # the username we created for RADIUS is the tx id (or other unique value)
@@ -918,12 +991,42 @@ def reconnect(username):
         cur.execute("SELECT * FROM hotspot_users WHERE username=%s ORDER BY id DESC LIMIT 1", (username,))
         user = cur.fetchone()
         if not user:
-            return jsonify({"status":"error","message":"User not found"}), 404
+            #return jsonify({"status":"error","message":"User not found"}), 404
+            #return render_template('error.html', title = 'error', message = 'User not found')
+            return render_template(
+
+                'error.html', 
+                icon = "🔎",
+                title='Oops! User Not Found', 
+                message="We couldn't find an account for that phone number. Please confirm and try again.",
+                more = ''
+            ), 404
 
         # If password mismatch -> fail (you may also consult radcheck instead)
+        
         expected = user.get('code_6char') or user.get('password')
         if not provided_password or provided_password != expected:
-            return jsonify({"status":"error","message":"Authentication failed"}), 401
+            #return jsonify({"status":"error","message":"Authentication failed"}), 401
+            return render_template(
+
+                'error.html', 
+                icon = "🔐",
+                title='Authentication Failed', 
+                message='The password or authorization code is incorrect. Please try again or reset your password.',
+                more = ''
+            ), 401
+        
+        if user.get('session_status') == 'expired':
+            logging.info(f'session expired on:{user.get('expires_at')}')
+            #return jsonify({"status":user.get("session_status"),"Time":user.get('expires_at')})
+            return render_template(
+
+                'error.html', 
+                icon = '⏰',
+                title='Session Expired', 
+                message=f"Your purchased session expired at {user.get('expires_at')}.",
+                more=user.get('expires_at')
+    )
 
         # Check existing active session for this username using MikroTik API
         api = get_mikrotik_api()
@@ -999,7 +1102,8 @@ def reconnect(username):
 
     except Exception as e:
         logging.exception("Reconnect error: %s", e)
-        return jsonify({"status":"error","message":str(e)}), 500
+        #return jsonify({"status":"error","message":str(e)}), 500
+        return render_template('error.html', icon = '⚠️', title='error',message=str(e)), 500
 
     finally:
         cur.close()
@@ -1092,5 +1196,5 @@ def switch_device(username):
 # -------------------------
 if __name__ == '__main__':
     if not os.getenv("WERKZEUG_RUN_MAIN"):  # Only start in main process, not reloader
-        threading.Timer(5, reconcile_pending_transactions).start()
+        threading.Timer(5, run_cron_jobs).start()
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Error</title>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+        /* Color Variables */
+        :root {
+            --color-bg: #1f2937; /* Gray 800/900 approximation */
+            --color-white: #ffffff;
+            --color-text-dark: #1f2937; /* Gray 900 */
+            --color-text-medium: #4b5563; /* Gray 600 */
+            --color-error: #ef4444; /* Red 500 */
+            --color-warning: #f97316; /* Orange 600 */
+            --color-info: #3b82f6; /* Blue 500 */
+            --color-shadow: rgba(0, 0, 0, 0.2);
+        }
+
+        /* Base Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        /* Modal Container */
+        #error_modal {
+            width: 100%;
+            max-width: 448px; /* max-w-md */
+        }
+
+        /* Modal Content Box */
+        #modal_content {
+            background-color: var(--color-white);
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 25px 50px -12px var(--color-shadow); /* shadow-2xl */
+            padding: 1.5rem; /* p-6 */
+        }
+
+        /* Layout and Text */
+        .header-controls {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .close-button {
+            color: #9ca3af; /* Gray 400 */
+            border: none;
+            background: none;
+            padding: 0;
+            cursor: pointer;
+            transition: color 150ms ease-in-out;
+        }
+
+        .close-button:hover {
+            color: var(--color-text-dark); /* Gray 700 */
+        }
+
+        .icon-area {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+            height: 4rem; /* h-16 */
+        }
+
+        .icon-svg {
+            height: 4rem; /* h-16 */
+            width: 4rem; /* w-16 */
+            stroke: currentColor;
+            stroke-width: 2;
+        }
+
+        .text-center-stack {
+            text-align: center;
+            padding-top: 0.5rem; /* pt-2 */
+        }
+        
+        .text-center-stack > * {
+            margin-top: 1rem; /* space-y-4, applied as top margin to children */
+        }
+        
+        .text-center-stack > :first-child {
+            margin-top: 0; 
+        }
+
+        #modal_title {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 800; /* font-extrabold */
+            color: var(--color-text-dark);
+        }
+
+        #modal_body {
+            color: var(--color-text-medium);
+            font-size: 1rem; /* text-base */
+        }
+
+        .footer-action {
+            padding-top: 1rem; /* pt-4 */
+        }
+        
+        /* Action Button Base Style */
+        .action-button {
+            width: 100%;
+            padding: 0.75rem 1rem; /* py-3 px-4 */
+            border: 1px solid transparent;
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-md */
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-medium */
+            color: var(--color-white);
+            transition: background-color 150ms ease-in-out, box-shadow 150ms ease-in-out;
+            cursor: pointer;
+        }
+        
+        /* Specific Button Colors - Controlled by JS, defined here for classes */
+        .btn-error {
+            background-color: var(--color-error);
+        }
+        .btn-error:hover {
+            background-color: #b91c1c; /* Red 700 */
+        }
+
+        .btn-warning {
+            background-color: var(--color-warning);
+        }
+        .btn-warning:hover {
+            background-color: #c2410c; /* Orange 700 */
+        }
+
+        .btn-info {
+            background-color: var(--color-info);
+        }
+        .btn-info:hover {
+            background-color: #2563eb; /* Blue 700 */
+        }
+        
+        /* Error Type Borders */
+        .border-warning { border-top: 4px solid var(--color-warning); }
+        .border-info { border-top: 4px solid var(--color-info); }
+
+        /* Animation Keyframes */
+        @keyframes wiggle {
+            0%, 7% { transform: rotateZ(0); }
+            15% { transform: rotateZ(-5deg); }
+            20% { transform: rotateZ(5deg); }
+            25% { transform: rotateZ(-5deg); }
+            30% { transform: rotateZ(5deg); }
+            35%, 100% { transform: rotateZ(0); }
+        }
+
+        .animate-wiggle {
+            animation: wiggle 0.8s ease-in-out infinite;
+        }
+
+        @keyframes scale-in {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-content-open {
+            animation: scale-in 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* Utility for JavaScript toggling */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Custom Modal Structure -->
+    <div id="error_modal">
+
+        <div id="modal_content" class="modal-content-open">
+            
+            <div class="header-controls">
+                <!-- Close Button -->
+                <button onclick="handleClose()" class="close-button">
+                    <svg class="w-6 h-6" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="text-center-stack">
+                
+                <!-- Icon/Animation Area -->
+                <div id="icon_area" class="icon-area">
+                    <!-- 404: User Not Found (Oops) - Red -->
+                    <svg id="icon_404" class="icon-svg hidden" style="color: var(--color-error);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+
+                    <!-- 401: Wrong Password (Wiggle Lock) - Orange -->
+                    <svg id="icon_401" class="icon-svg hidden" style="color: var(--color-warning);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+
+                    <!-- Expired: Session Expired (Clock/Time Out) - Blue -->
+                    <svg id="icon_expired" class="icon-svg hidden" style="color: var(--color-info);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+
+                <!-- Title and Message -->
+                <h3 id="modal_title"></h3>
+                <p id="modal_body"></p>
+
+                <!-- Footer Action -->
+                <div class="footer-action">
+                    <button onclick="handleAction()" id="action_button" class="action-button btn-error">
+                        Try Again
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <script>
+        // --- SIMULATED BACKEND INJECTION DATA ---
+        // In a real Flask/Jinja app, you would dynamically inject these values.
+        // The current simulation is for Case 2 (Wrong Password / 401)
+        const ERROR_TYPE = '401';
+        const ERROR_TITLE = "Authentication Failed";
+        const ERROR_MESSAGE = "The password or authorization code is incorrect. Please try again or reset your password.";
+        // const EXPIRED_TIME = "10:30 AM, 15 Oct 2025"; // Only used for 'expired' case
+        // ----------------------------------------
+
+        const modalContent = document.getElementById('modal_content');
+        const modalTitle = document.getElementById('modal_title');
+        const modalBody = document.getElementById('modal_body');
+        const actionButton = document.getElementById('action_button');
+        
+        const icon404 = document.getElementById('icon_404');
+        const icon401 = document.getElementById('icon_401');
+        const iconExpired = document.getElementById('icon_expired');
+        
+        // Classes to toggle
+        const HIDDEN_CLASS = 'hidden';
+        const WIGGLE_CLASS = 'animate-wiggle';
+        const BTN_ERROR = 'btn-error';
+        const BTN_WARNING = 'btn-warning';
+        const BTN_INFO = 'btn-info';
+        const BORDER_WARNING = 'border-warning';
+        const BORDER_INFO = 'border-info';
+
+
+        /**
+         * Initializes the modal content based on the injected error type.
+         */
+        function initializeModal() {
+            modalTitle.textContent = ERROR_TITLE;
+            modalBody.textContent = ERROR_MESSAGE;
+            
+            // 1. Reset state
+            icon404.classList.add(HIDDEN_CLASS);
+            icon401.classList.remove(WIGGLE_CLASS);
+            icon401.classList.add(HIDDEN_CLASS);
+            iconExpired.classList.add(HIDDEN_CLASS);
+            
+            actionButton.classList.remove(BTN_ERROR, BTN_WARNING, BTN_INFO);
+            modalContent.classList.remove(BORDER_WARNING, BORDER_INFO);
+            
+            // 2. Set content based on error type
+            switch (ERROR_TYPE) {
+                case '404':
+                    icon404.classList.remove(HIDDEN_CLASS);
+                    actionButton.textContent = "Check Username";
+                    actionButton.classList.add(BTN_ERROR);
+                    break;
+                case '401':
+                    icon401.classList.remove(HIDDEN_CLASS);
+                    icon401.classList.add(WIGGLE_CLASS); // Add the animation
+                    actionButton.textContent = "Re-enter Credentials";
+                    actionButton.classList.add(BTN_WARNING);
+                    modalContent.classList.add(BORDER_WARNING);
+                    break;
+                case 'expired':
+                    iconExpired.classList.remove(HIDDEN_CLASS);
+                    // Modify message to include time if available (simulated)
+                    const time = typeof EXPIRED_TIME !== 'undefined' ? EXPIRED_TIME : 'an unknown time';
+                    modalBody.textContent = `Your session expired at ${time}. Please make a new payment.`;
+                    actionButton.textContent = "Go to Payment Page";
+                    actionButton.classList.add(BTN_INFO);
+                    modalContent.classList.add(BORDER_INFO);
+                    break;
+                default:
+                    // Default generic error
+                    actionButton.textContent = "Close";
+                    actionButton.classList.add(BTN_ERROR);
+                    break;
+            }
+        }
+
+        /**
+         * Handles the action button click (e.g., redirect to login/payment).
+         */
+        function handleAction() {
+            console.log(`Action button clicked for error type: ${ERROR_TYPE}`);
+            // In a real application, this would redirect the user to the login or payment page.
+            window.location.reload(); 
+        }
+
+        /**
+         * Handles the close button click (redirects to the root of the current site).
+         */
+        function handleClose() {
+             console.log(`Close button clicked.`);
+             // Use window.location.origin to ensure a fully qualified URL for robust redirection.
+             window.location.href = window.location.origin;
+        }
+
+        // Initialize on load
+        window.onload = initializeModal;
+    </script>
+</body>
+</html>

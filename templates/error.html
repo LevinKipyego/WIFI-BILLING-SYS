@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <style>
+
+            @font-face {
+                            font-family: "Sour Gummy";
+                            src: url("/static/fonts/sour-gummy_5.2.8/webfonts/sour-gummy-minimal.woff2") format("woff2");
+                            
+                            font-weight: normal;
+                            font-style: normal;
+                            font-display: swap;
+                            }  
+
+            body {
+                font-family: "Sour Gummy";
+                background: #f5f6fa;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                height: 100vh;
+                align-items: center;
+                justify-content: center;
+                text-align: justify;
+                line-height: 1.4rem;
+            }
+
+            .card {
+            
+                width: 300px;
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+                position: relative;
+                animation: fadeIn 0.5s ease-out, slideUp 0.5s ease-out;
+                
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            @keyframes slideUp {
+                from { transform: translateY(30px); }
+                to { transform: translateY(0); }
+            }
+
+            @keyframes shake {
+                10%, 90% { transform: translateX(-1px); }
+                20%, 80% { transform: translateX(2px); }
+                30%, 50%, 70% { transform: translateX(-4px); }
+                40%, 60% { transform: translateX(4px); }
+            }
+
+            .shake {
+                animation: shake 0.9s;
+            }
+
+            .close {
+                position: absolute;
+                top: 12px;
+                right: 16px;
+                cursor: pointer;
+                font-size: 30px;
+                color: #999;
+                padding: 0.1em;
+            }
+
+            .icon {
+                font-size: 50px;
+                text-align: center;
+                margin-bottom: 15px;
+                color: #e74c3c;
+                line-height: normal;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card shake">
+            <div class="close" onclick="window.location.href='http://levine.net'">×</div>
+            <div class="icon">{{icon}}</div>
+            <h2 >{{title}}</h2>
+            <p style="color:#333;">{{message}}</p>
+            <p >{{more}}</p>
+        </div>
+    </body>
+    <script>
+         window.close = function(){
+            window.location.href = 'http://10.0.0.1'
+        }
+    </script>
+    </html>
