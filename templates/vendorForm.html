@@ -1,0 +1,11 @@
+<form method="POST" action="/vendor/payments/mpesa">
+<input name="shortcode" placeholder="PayBill Number" required>
+<input name="consumer_key" placeholder="Consumer Key" required>
+<input name="consumer_secret" placeholder="Consumer Secret" required>
+<input name="passkey" placeholder="Passkey" required>
+<select name="environment">
+<option value="SANDBOX">Sandbox</option>
+<option value="PRODUCTION">Production</option>
+</select>
+<button type="submit">Save & Test</button>
+</form>
