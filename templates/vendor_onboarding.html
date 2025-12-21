@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vendor Onboarding</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: #2d3436;
+}
+
+/* Container Styling */
+.container {
+    background: rgba(255, 255, 255, 0.95);
+    width: 100%;
+    max-width: 600px;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Typography */
+h2 {
+    font-size: 1.5rem;
+    color: #1a2a6c;
+    margin-bottom: 20px;
+    margin-top: 30px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #3b82f6;
+    display: inline-block;
+}
+
+h2:first-of-type {
+    margin-top: 0;
+}
+
+/* Form Layout */
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #4b5563;
+}
+
+/* Input Styling */
+input {
+    width: 100%;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: #ffffff;
+    outline: none;
+}
+
+input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    transform: translateY(-1px);
+}
+
+input::placeholder {
+    color: #9ca3af;
+}
+
+/* Button Styling */
+button[type="submit"] {
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    color: white;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(30, 64, 175, 0.3);
+    filter: brightness(1.1);
+}
+
+button[type="submit"]:active {
+    transform: translateY(0);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+    .container {
+        padding: 25px 20px;
+        border-radius: 15px;
+    }
+
+    h2 {
+        font-size: 1.25rem;
+        margin-top: 25px;
+    }
+
+    input {
+        padding: 10px 14px;
+        font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+
+    button[type="submit"] {
+        padding: 14px;
+        font-size: 1rem;
+    }
+}
+
+/* Subtle Animation for inputs */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.container {
+    animation: fadeIn 0.5s ease-out;
+}
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <h2>Vendor Information</h2>
+    <form method="POST" action="/vendors/onboard">
+
+        <label>Vendor Name</label>
+        <input type="text" name="vendor_name" required>
+
+        <label>Email</label>
+        <input type="email" name="vendor_email">
+
+        <label>Phone</label>
+        <input type="text" name="vendor_phone" placeholder="+2547XXXXXXXX">
+
+        <h2>MikroTik Router Details</h2>
+
+        <label>Router Name</label>
+        <input type="text" name="router_name" required>
+
+        <label>Router IP</label>
+        <input type="text" name="router_ip" placeholder="192.168.88.1" required>
+
+        <label>Router Username</label>
+        <input type="text" name="router_username" required>
+
+        <label>Router Password</label>
+        <input type="password" name="router_password" required>
+
+        <h2>M-Pesa Configuration</h2>
+
+        <label>Shortcode</label>
+        <input type="text" name="mpesa_shortcode" required>
+
+        <label>Consumer Key</label>
+        <input type="text" name="mpesa_consumer_key" required>
+
+        <label>Consumer Secret</label>
+        <input type="password" name="mpesa_consumer_secret" required>
+
+        <label>Passkey</label>
+        <input type="password" name="mpesa_passkey" required>
+
+        <button type="submit">Onboard Vendor</button>
+
+    </form>
+
+</div>
+
+</body>
+</html>
